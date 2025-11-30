@@ -120,18 +120,44 @@ def handle_response(response: httpx.Response) -> dict[str, Any]:
         CLIError: For other error responses
     """
     if response.status_code == 401:
-        raise AuthError("Authentication required. Please run 'openwebui auth login'")
+        raise AuthError(
+            "Authentication required. Please run 'openwebui auth login' first.\n"
+            "If you recently logged in, your token may have expired."
+        )
     elif response.status_code == 403:
-        raise AuthError("Permission denied. Check your access rights.")
+        raise AuthError(
+            "Permission denied. This operation requires higher privileges.\n"
+            "Possible causes:\n"
+            "  - Your user role lacks required permissions\n"
+            "  - The API key doesn't have sufficient access\n"
+            "  - Try logging in again: openwebui auth login"
+        )
+    elif response.status_code == 404:
+        try:
+            error_data = response.json()
+            message = error_data.get("detail", error_data.get("message", "Resource not found"))
+        except Exception:
+            message = "Resource not found"
+        raise ServerError(
+            f"Not found: {message}\n"
+            "Check that the resource ID, model name, or endpoint is correct."
+        )
     elif response.status_code >= 500:
-        raise ServerError(f"Server error: {response.status_code} - {response.text}")
+        raise ServerError(
+            f"Server error ({response.status_code}): {response.text}\n"
+            "The OpenWebUI server encountered an error.\n"
+            "Try again in a moment, or check server logs if you're the administrator."
+        )
     elif response.status_code >= 400:
         try:
             error_data = response.json()
             message = error_data.get("detail", error_data.get("message", response.text))
         except Exception:
             message = response.text
-        raise ServerError(f"API error: {response.status_code} - {message}")
+        raise ServerError(
+            f"API error ({response.status_code}): {message}\n"
+            "Check your request parameters and try again."
+        )
 
     try:
         return response.json()
@@ -142,10 +168,25 @@ def handle_response(response: httpx.Response) -> dict[str, Any]:
 def handle_request_error(error: Exception) -> None:
     """Convert httpx errors to CLI errors."""
     if isinstance(error, httpx.ConnectError):
-        raise NetworkError(f"Could not connect to server: {error}")
+        raise NetworkError(
+            f"Could not connect to server: {error}\n"
+            "Possible solutions:\n"
+            "  - Check that OpenWebUI is running\n"
+            "  - Verify the URI: openwebui config init\n"
+            "  - Try: openwebui --uri http://localhost:8080 auth login"
+        )
     elif isinstance(error, httpx.TimeoutException):
-        raise NetworkError(f"Request timed out: {error}")
+        raise NetworkError(
+            f"Request timed out: {error}\n"
+            "Possible solutions:\n"
+            "  - Increase timeout: openwebui --timeout 60 ...\n"
+            "  - Check your network connection\n"
+            "  - The server might be overloaded"
+        )
     elif isinstance(error, httpx.RequestError):
-        raise NetworkError(f"Request failed: {error}")
+        raise NetworkError(
+            f"Request failed: {error}\n"
+            "Check your network connection and server configuration."
+        )
     else:
         raise error

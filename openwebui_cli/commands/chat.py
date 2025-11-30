@@ -28,6 +28,7 @@ def send(
     temperature: float | None = typer.Option(None, "--temperature", "-T", help="Temperature (0.0-2.0)"),
     max_tokens: int | None = typer.Option(None, "--max-tokens", help="Max response tokens"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    history_file: str | None = typer.Option(None, "--history-file", help="Load conversation history from JSON file"),
 ) -> None:
     """Send a chat message."""
     obj = ctx.obj or {}
@@ -41,10 +42,38 @@ def send(
             console.print("[red]Error: Prompt required. Use -p or pipe input.[/red]")
             raise typer.Exit(2)
 
-    # Build messages
+    # Load conversation history if provided
     messages = []
-    if system:
-        messages.append({"role": "system", "content": system})
+    if history_file:
+        try:
+            from pathlib import Path
+            history_path = Path(history_file)
+            if not history_path.exists():
+                console.print(f"[red]Error: History file not found: {history_file}[/red]")
+                raise typer.Exit(2)
+
+            with open(history_path) as f:
+                history_data = json.load(f)
+                # Support both direct array and object with 'messages' key
+                if isinstance(history_data, list):
+                    messages = history_data
+                elif isinstance(history_data, dict) and "messages" in history_data:
+                    messages = history_data["messages"]
+                else:
+                    console.print("[red]Error: History file must contain array of messages or object with 'messages' key[/red]")
+                    raise typer.Exit(2)
+        except json.JSONDecodeError as e:
+            console.print(f"[red]Error: Invalid JSON in history file: {e}[/red]")
+            raise typer.Exit(2)
+        except Exception as e:
+            console.print(f"[red]Error loading history file: {e}[/red]")
+            raise typer.Exit(2)
+
+    # Build messages (add system prompt if not in history)
+    if system and not any(msg.get("role") == "system" for msg in messages):
+        messages.insert(0, {"role": "system", "content": system})
+
+    # Add current user prompt
     messages.append({"role": "user", "content": prompt})
 
     # Build request body
@@ -78,33 +107,49 @@ def send(
         ) as client:
             if body.get("stream"):
                 # Streaming response
-                with client.stream(
-                    "POST",
-                    "/api/v1/chat/completions",
-                    json=body,
-                ) as response:
-                    if response.status_code >= 400:
-                        handle_response(response)
+                try:
+                    with client.stream(
+                        "POST",
+                        "/api/v1/chat/completions",
+                        json=body,
+                    ) as response:
+                        if response.status_code >= 400:
+                            handle_response(response)
 
-                    full_content = ""
-                    for line in response.iter_lines():
-                        if line.startswith("data: "):
-                            data_str = line[6:]
-                            if data_str.strip() == "[DONE]":
-                                break
-                            try:
-                                data = json.loads(data_str)
-                                delta = data.get("choices", [{}])[0].get("delta", {})
-                                content = delta.get("content", "")
-                                if content:
-                                    print(content, end="", flush=True)
-                                    full_content += content
-                            except json.JSONDecodeError:
-                                continue
-                    print()  # Final newline
+                        full_content = ""
+                        try:
+                            for line in response.iter_lines():
+                                if line.startswith("data: "):
+                                    data_str = line[6:]
+                                    if data_str.strip() == "[DONE]":
+                                        break
+                                    try:
+                                        data = json.loads(data_str)
+                                        delta = data.get("choices", [{}])[0].get("delta", {})
+                                        content = delta.get("content", "")
+                                        if content:
+                                            print(content, end="", flush=True)
+                                            full_content += content
+                                    except json.JSONDecodeError:
+                                        # Skip malformed JSON chunks
+                                        continue
+                        except KeyboardInterrupt:
+                            # Gracefully handle Ctrl-C during streaming
+                            print()  # Newline after partial output
+                            console.print("\n[yellow]Stream interrupted by user[/yellow]")
+                            if full_content and json_output:
+                                console.print(json.dumps({"content": full_content, "interrupted": True}, indent=2))
+                            raise typer.Exit(0)
 
-                    if json_output:
-                        console.print(json.dumps({"content": full_content}, indent=2))
+                        print()  # Final newline
+
+                        if json_output:
+                            console.print(json.dumps({"content": full_content}, indent=2))
+
+                except (ConnectionError, TimeoutError) as e:
+                    console.print(f"\n[red]Connection error during streaming: {e}[/red]")
+                    console.print("[yellow]Try reducing timeout or checking network connection[/yellow]")
+                    raise typer.Exit(4)
             else:
                 # Non-streaming response
                 response = client.post("/api/v1/chat/completions", json=body)
@@ -116,6 +161,10 @@ def send(
                     content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
                     console.print(content)
 
+    except KeyboardInterrupt:
+        # Handle Ctrl-C at top level
+        console.print("\n[yellow]Operation cancelled[/yellow]")
+        raise typer.Exit(0)
     except Exception as e:
         handle_request_error(e)
 

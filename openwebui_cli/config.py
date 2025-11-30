@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings
 
 
@@ -60,13 +60,11 @@ class Config(BaseModel):
 class Settings(BaseSettings):
     """Environment-based settings that override config file."""
 
+    model_config = ConfigDict(env_prefix="", case_sensitive=False)
+
     openwebui_uri: str | None = None
     openwebui_token: str | None = None
     openwebui_profile: str | None = None
-
-    class Config:
-        env_prefix = ""
-        case_sensitive = False
 
 
 def load_config() -> Config:
