@@ -5,11 +5,9 @@ import sys
 
 import typer
 from rich.console import Console
-from rich.live import Live
-from rich.text import Text
 
 from ..config import load_config
-from ..http import create_client, handle_response, handle_request_error
+from ..http import create_client, handle_request_error, handle_response
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -18,21 +16,36 @@ console = Console()
 @app.command()
 def send(
     ctx: typer.Context,
-    model: str = typer.Option(..., "--model", "-m", help="Model to use"),
+    model: str | None = typer.Option(None, "--model", "-m", help="Model (default from config)"),
     prompt: str | None = typer.Option(None, "--prompt", "-p", help="User prompt (or use stdin)"),
     system: str | None = typer.Option(None, "--system", "-s", help="System prompt"),
     chat_id: str | None = typer.Option(None, "--chat-id", help="Continue existing conversation"),
     file: list[str] | None = typer.Option(None, "--file", help="RAG file ID(s) for context"),
-    collection: list[str] | None = typer.Option(None, "--collection", help="RAG collection ID(s) for context"),
+    collection: list[str] | None = typer.Option(
+        None, "--collection", help="RAG collection ID(s) for context"
+    ),
     no_stream: bool = typer.Option(False, "--no-stream", help="Wait for complete response"),
-    temperature: float | None = typer.Option(None, "--temperature", "-T", help="Temperature (0.0-2.0)"),
+    temperature: float | None = typer.Option(
+        None, "--temperature", "-T", help="Temperature (0.0-2.0)"
+    ),
     max_tokens: int | None = typer.Option(None, "--max-tokens", help="Max response tokens"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
-    history_file: str | None = typer.Option(None, "--history-file", help="Load conversation history from JSON file"),
+    history_file: str | None = typer.Option(
+        None, "--history-file", help="Load conversation history from JSON file"
+    ),
 ) -> None:
     """Send a chat message."""
     obj = ctx.obj or {}
     config = load_config()
+
+    # Get effective model (CLI arg > config default)
+    effective_model = model or config.defaults.model
+    if not effective_model:
+        console.print(
+            "[red]Error: No model specified and no default in config[/red]\n"
+            "Use: openwebui chat send -m MODEL or set default with: openwebui config init"
+        )
+        raise typer.Exit(2)
 
     # Get prompt from stdin if not provided
     if prompt is None:
@@ -47,6 +60,7 @@ def send(
     if history_file:
         try:
             from pathlib import Path
+
             history_path = Path(history_file)
             if not history_path.exists():
                 console.print(f"[red]Error: History file not found: {history_file}[/red]")
@@ -60,7 +74,10 @@ def send(
                 elif isinstance(history_data, dict) and "messages" in history_data:
                     messages = history_data["messages"]
                 else:
-                    console.print("[red]Error: History file must contain array of messages or object with 'messages' key[/red]")
+                    console.print(
+                        "[red]Error: History file must contain array of messages "
+                        "or object with 'messages' key[/red]"
+                    )
                     raise typer.Exit(2)
         except json.JSONDecodeError as e:
             console.print(f"[red]Error: Invalid JSON in history file: {e}[/red]")
@@ -78,7 +95,7 @@ def send(
 
     # Build request body
     body: dict = {
-        "model": model,
+        "model": effective_model,
         "messages": messages,
         "stream": not no_stream and config.defaults.stream,
     }
@@ -98,6 +115,10 @@ def send(
             files_context.append({"type": "collection", "id": c})
     if files_context:
         body["files"] = files_context
+
+    # Add chat_id if continuing conversation
+    if chat_id:
+        body["chat_id"] = chat_id
 
     try:
         with create_client(
@@ -138,17 +159,23 @@ def send(
                             print()  # Newline after partial output
                             console.print("\n[yellow]Stream interrupted by user[/yellow]")
                             if full_content and json_output:
-                                console.print(json.dumps({"content": full_content, "interrupted": True}, indent=2))
+                                console.print(
+                                    json.dumps(
+                                        {"content": full_content, "interrupted": True}, indent=2
+                                    )
+                                )
                             raise typer.Exit(0)
 
                         print()  # Final newline
 
-                        if json_output:
+                        if json_output or obj.get("format") == "json":
                             console.print(json.dumps({"content": full_content}, indent=2))
 
                 except (ConnectionError, TimeoutError) as e:
                     console.print(f"\n[red]Connection error during streaming: {e}[/red]")
-                    console.print("[yellow]Try reducing timeout or checking network connection[/yellow]")
+                    console.print(
+                        "[yellow]Try reducing timeout or checking network connection[/yellow]"
+                    )
                     raise typer.Exit(4)
             else:
                 # Non-streaming response

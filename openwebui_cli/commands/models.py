@@ -6,7 +6,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from ..http import create_client, handle_response, handle_request_error
+from ..http import create_client, handle_request_error, handle_response
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()

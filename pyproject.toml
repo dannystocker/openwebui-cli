@@ -42,10 +42,11 @@ dev = [
     "pytest-cov>=4.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
+    "types-PyYAML>=6.0.0",
 ]
 
 [project.scripts]
-openwebui = "openwebui_cli.main:app"
+openwebui = "openwebui_cli.main:cli"
 
 [project.urls]
 Homepage = "https://github.com/dannystocker/openwebui-cli"

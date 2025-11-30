@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from ..http import create_client, handle_response, handle_request_error
+from ..http import create_client, handle_request_error, handle_response
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -95,14 +95,16 @@ def upload(
                         )
                         console.print(f"  Added to collection: {collection}")
                     except Exception as e:
-                        console.print(f"  [yellow]Warning: Could not add to collection: {e}[/yellow]")
+                        console.print(
+                            f"  [yellow]Warning: Could not add to collection: {e}[/yellow]"
+                        )
 
     except Exception as e:
         handle_request_error(e)
 
 
-@files_app.command()
-def delete(
+@files_app.command("delete")
+def delete_file(
     ctx: typer.Context,
     file_id: str = typer.Argument(..., help="File ID to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
@@ -190,8 +192,8 @@ def create(
         handle_request_error(e)
 
 
-@collections_app.command()
-def delete(
+@collections_app.command("delete")
+def delete_collection(
     ctx: typer.Context,
     collection_id: str = typer.Argument(..., help="Collection ID to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),

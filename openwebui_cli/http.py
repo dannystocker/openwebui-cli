@@ -1,13 +1,12 @@
 """HTTP client wrapper for OpenWebUI API."""
 
-from typing import Any, AsyncIterator
+from typing import Any
 
 import httpx
 import keyring
 
 from .config import get_effective_config, load_config
 from .errors import AuthError, NetworkError, ServerError
-
 
 KEYRING_SERVICE = "openwebui-cli"
 
@@ -45,7 +44,7 @@ def create_client(
     Args:
         profile: Profile name to use
         uri: Override server URI
-        token: Override token (otherwise uses keyring)
+        token: Override token (otherwise uses env var or keyring)
         timeout: Request timeout in seconds
 
     Returns:
@@ -54,9 +53,12 @@ def create_client(
     effective_uri, effective_profile = get_effective_config(profile, uri)
     config = load_config()
 
-    # Get token from keyring if not provided
+    # Get token with precedence: param > env var > keyring
     if token is None:
-        token = get_token(effective_profile, effective_uri)
+        from .config import Settings
+
+        settings = Settings()
+        token = settings.openwebui_token or get_token(effective_profile, effective_uri)
 
     # Build headers
     headers = {
@@ -87,8 +89,12 @@ def create_async_client(
     effective_uri, effective_profile = get_effective_config(profile, uri)
     config = load_config()
 
+    # Get token with precedence: param > env var > keyring
     if token is None:
-        token = get_token(effective_profile, effective_uri)
+        from .config import Settings
+
+        settings = Settings()
+        token = settings.openwebui_token or get_token(effective_profile, effective_uri)
 
     headers = {
         "Content-Type": "application/json",
@@ -139,8 +145,7 @@ def handle_response(response: httpx.Response) -> dict[str, Any]:
         except Exception:
             message = "Resource not found"
         raise ServerError(
-            f"Not found: {message}\n"
-            "Check that the resource ID, model name, or endpoint is correct."
+            f"Not found: {message}\nCheck that the resource ID, model name, or endpoint is correct."
         )
     elif response.status_code >= 500:
         raise ServerError(
@@ -185,8 +190,7 @@ def handle_request_error(error: Exception) -> None:
         )
     elif isinstance(error, httpx.RequestError):
         raise NetworkError(
-            f"Request failed: {error}\n"
-            "Check your network connection and server configuration."
+            f"Request failed: {error}\nCheck your network connection and server configuration."
         )
     else:
         raise error

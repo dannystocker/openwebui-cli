@@ -5,8 +5,15 @@ from rich.console import Console
 from rich.prompt import Prompt
 
 from ..config import get_effective_config
-from ..http import create_client, set_token, delete_token, get_token, handle_response, handle_request_error
 from ..errors import AuthError
+from ..http import (
+    create_client,
+    delete_token,
+    get_token,
+    handle_request_error,
+    handle_response,
+    set_token,
+)
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -16,7 +23,9 @@ console = Console()
 def login(
     ctx: typer.Context,
     username: str | None = typer.Option(None, "--username", "-u", help="Username or email"),
-    password: str | None = typer.Option(None, "--password", "-p", help="Password (will prompt if not provided)"),
+    password: str | None = typer.Option(
+        None, "--password", "-p", help="Password (will prompt if not provided)"
+    ),
 ) -> None:
     """Login to OpenWebUI instance."""
     obj = ctx.obj or {}
@@ -93,7 +102,9 @@ def token(
         if show:
             console.print(f"[bold]Token:[/bold] {stored_token}")
         else:
-            masked = stored_token[:8] + "..." + stored_token[-4:] if len(stored_token) > 12 else "***"
+            masked = (
+                stored_token[:8] + "..." + stored_token[-4:] if len(stored_token) > 12 else "***"
+            )
             console.print(f"[bold]Token:[/bold] {masked}")
         console.print(f"[bold]Profile:[/bold] {profile}")
         console.print(f"[bold]URI:[/bold] {uri}")

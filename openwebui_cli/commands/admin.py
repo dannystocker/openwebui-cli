@@ -6,8 +6,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from ..http import create_client, handle_response, handle_request_error
 from ..errors import AuthError
+from ..http import create_client, handle_request_error, handle_response
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -36,9 +36,11 @@ def stats(
                 user_data = handle_response(response)
 
                 if user_data.get("role") != "admin":
+                    user_name = user_data.get("name")
+                    user_role = user_data.get("role")
                     raise AuthError(
                         f"Admin command requires admin privileges; "
-                        f"your current user is '{user_data.get('name')}' with role: [{user_data.get('role')}]"
+                        f"your current user is '{user_name}' with role: [{user_role}]"
                     )
 
                 # Build basic stats
