@@ -99,11 +99,16 @@ def create_client(
     if timeout is None:
         timeout = config.defaults.timeout
 
-    return httpx.Client(
+    client = httpx.Client(
         base_url=effective_uri,
         headers=headers,
         timeout=timeout,
     )
+
+    if _is_verbose_enabled():
+        _emit_verbose_config(effective_uri, headers, timeout)
+
+    return client
 
 
 def create_async_client(
@@ -153,11 +158,16 @@ def create_async_client(
     if timeout is None:
         timeout = config.defaults.timeout
 
-    return httpx.AsyncClient(
+    client = httpx.AsyncClient(
         base_url=effective_uri,
         headers=headers,
         timeout=timeout,
     )
+
+    if _is_verbose_enabled():
+        _emit_verbose_config(effective_uri, headers, timeout, async_client=True)
+
+    return client
 
 
 def handle_response(response: httpx.Response) -> dict[str, Any]:
@@ -264,9 +274,24 @@ def _is_verbose_enabled() -> bool:
     try:
         import typer
 
-        ctx = typer.get_current_context(silent=True)
+        ctx = typer.core.TyperGroup.get_current_context(silent=True)  # type: ignore[attr-defined]
         if ctx and isinstance(ctx.obj, dict):
             return bool(ctx.obj.get("verbose"))
     except Exception:
         return False
     return False
+
+
+def _emit_verbose_config(
+    uri: str, headers: dict[str, str], timeout: float, async_client: bool = False
+) -> None:
+    """Emit basic client config when verbose is enabled."""
+    try:
+        Console().log(
+            f"[bold cyan]openwebui-cli[/bold cyan] client init "
+            f"(async={async_client}) uri={uri} timeout={timeout}s "
+            f"auth={'yes' if 'Authorization' in headers else 'no'}"
+        )
+    except Exception:
+        # Do not break execution if logging fails
+        pass
