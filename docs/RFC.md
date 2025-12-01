@@ -1,16 +1,22 @@
-# OpenWebUI Official CLI - RFC Proposal
+# OpenWebUI CLI - RFC Proposal
 
 **Document Version:** 1.2
 **Date:** November 30, 2025
-**Author:** InfraFabric Team
+**Author:** InfraFabric Team / Danny Stocker
 **Target:** OpenWebUI Core Team Review
-**Status:** DRAFT - Reviewed & Implementation-Ready
+**Status:** DRAFT - Community Proposal
+
+---
+
+> **Disclaimer:** This RFC and the accompanying CLI implementation (`dannystocker/openwebui-cli`) are not affiliated with or endorsed by the OpenWebUI project. This is a community proposal demonstrating what an official CLI could look like, with the hope that the OpenWebUI team might find it useful.
+>
+> If the OpenWebUI team isn't interested in official adoption, that's completely fine - this will remain a community tool for anyone who finds it helpful.
 
 ---
 
 ## Executive Summary
 
-We propose building an **official CLI for OpenWebUI** to complement the web interface. This CLI would enable developers, DevOps engineers, and power users to interact with OpenWebUI programmatically from the command line, enabling automation, scripting, and integration into CI/CD pipelines.
+We'd like to propose building an **official CLI for OpenWebUI** to complement the web interface. This CLI would enable developers, DevOps engineers, and power users to interact with OpenWebUI programmatically from the command line, enabling automation, scripting, and integration into CI/CD pipelines.
 
 **Why Now:**
 - No official CLI exists (only `open-webui serve` to start server)

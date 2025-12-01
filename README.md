@@ -4,7 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)]()
 
-Official command-line interface for [OpenWebUI](https://github.com/open-webui/open-webui).
+A command-line interface for [OpenWebUI](https://github.com/open-webui/open-webui).
+
+> **Note:** This is a community project proposing what an official CLI could look like. Not currently affiliated with or endorsed by the OpenWebUI team. See `docs/RFC.md` for the full proposal.
 
 > Status: Alpha (v0.1.0) — tested, linted, ~90% coverage. Known limitations: OAuth/provider login and API key management are not implemented yet; models pull/delete depend on server support.
 
@@ -170,6 +172,8 @@ pytest tests/ --cov=openwebui_cli
 ## License
 
 MIT License - see [LICENSE](LICENSE).
+
+> **Note on license:** OpenWebUI itself uses a modified BSD-3-Clause license with branding requirements. This CLI uses MIT for simplicity as a community tool. If the OpenWebUI team were interested in official adoption, we'd happily relicense to match their terms.
 
 ## Credits
 
