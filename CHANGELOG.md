@@ -115,9 +115,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Streaming response handling for chat operations
 - Token precedence system (CLI flag now properly overrides all other sources)
 - File permission handling for config operations
-
 #### Quality Improvements
 - Proper error propagation and handling in HTTP layer
+
+## [0.1.1-alpha] - 2025-12-01
+
+### Added
+- Community scaffolding: issue templates (bug/feature), PR template, CODEOWNERS, CODE_OF_CONDUCT, CONTRIBUTING, SECURITY, MAINTAINERS, CI workflow (ruff, mypy, pytest, pip-audit).
+- Docs: commands overview and configuration guide; moved internal reports to `docs/internals/`; README updated with default model example, known limitations, and credits.
+- CLI: verbose/debug flag now emits client init info and hints in request errors; `chat send` help clarifies it starts a new chat unless `--chat-id` is provided.
+
+### Changed
+- RFC aligned to actual config path (`~/.config/openwebui/config.yaml` or `%APPDATA%\openwebui\config.yaml`) and marked OAuth/API-key flows as deferred.
+- `chat list` explicitly marked as not implemented yet (pagination planned).
+
+### Quality
+- Maintained ~94% coverage (pytest), mypy/ruff clean, pip-audit clean after changes.
 - Improved error messages with suggested solutions
 - Fixed race conditions in async test fixtures
 - Proper resource cleanup in HTTP client context managers
