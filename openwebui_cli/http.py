@@ -242,8 +242,17 @@ def handle_request_error(error: Exception) -> None:
             "  - The server might be overloaded"
         )
     elif isinstance(error, httpx.RequestError):
+        url_msg = ""
+        try:
+            request_url = error.request.url  # may raise if request is unset
+            url_msg = f" (URL: {request_url!s})"
+        except Exception:
+            url_msg = ""
         raise NetworkError(
-            f"Request failed: {error}\nCheck your network connection and server configuration."
+            f"Request failed: {error}{url_msg}\n"
+            "Check your network connection and server configuration. "
+            "Use --verbose to see more details."
         )
     else:
+        # Bubble up unknown errors unchanged (e.g., typer.Exit for graceful exits)
         raise error

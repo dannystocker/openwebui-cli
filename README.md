@@ -102,6 +102,12 @@ More details: `docs/guides/configuration.md`.
 
 ## Usage examples
 
+- Set a default model (so you don’t pass `-m` each time):
+  ```bash
+  openwebui config set defaults.model llama3.2:latest
+  openwebui chat send -p "Hello"  # uses the default model
+  ```
+
 - Non-streaming chat with JSON output:
   ```bash
   openwebui chat send -m my-model -p "Summarize" --no-stream --json

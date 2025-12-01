@@ -35,7 +35,7 @@ def send(
         None, "--history-file", help="Load conversation history from JSON file"
     ),
 ) -> None:
-    """Send a chat message."""
+    """Send a chat message (starts a new chat unless --chat-id is provided)."""
     obj = ctx.obj or {}
     config = load_config()
 
@@ -204,8 +204,11 @@ def list_chats(
     limit: int = typer.Option(20, "--limit", "-n", help="Number of chats to show"),
     archived: bool = typer.Option(False, "--archived", help="Show archived chats"),
 ) -> None:
-    """List conversations (v1.1 feature - placeholder)."""
-    console.print("[yellow]Chat list will be available in v1.1[/yellow]")
+    """List conversations (placeholder; server pagination not yet wired)."""
+    console.print(
+        "[yellow]Chat list is not implemented yet.[/yellow] "
+        "Pagination will be added in a future release."
+    )
 
 
 @app.command()
