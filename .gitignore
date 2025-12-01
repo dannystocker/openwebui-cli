@@ -40,6 +40,7 @@ ENV/
 htmlcov/
 .tox/
 .nox/
+.ruff_cache/
 
 # Type checking
 .mypy_cache/
@@ -59,3 +60,9 @@ Thumbs.db
 # Project specific
 config.yaml
 *.log
+.coverage.*
+*.pyc
+__pycache__/
+dist/
+build/
+*.egg-info/

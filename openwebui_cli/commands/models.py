@@ -24,6 +24,7 @@ def list_models(
         with create_client(
             profile=obj.get("profile"),
             uri=obj.get("uri"),
+            token=obj.get("token"),
         ) as client:
             response = client.get("/api/models")
             data = handle_response(response)
@@ -66,6 +67,7 @@ def info(
         with create_client(
             profile=obj.get("profile"),
             uri=obj.get("uri"),
+            token=obj.get("token"),
         ) as client:
             response = client.get(f"/api/models/{model_id}")
             data = handle_response(response)
@@ -90,10 +92,52 @@ def info(
 def pull(
     ctx: typer.Context,
     model_name: str = typer.Argument(..., help="Model name to pull"),
+    force: bool = typer.Option(False, "--force", "-f", help="Re-pull existing models"),
     progress: bool = typer.Option(True, "--progress/--no-progress", help="Show download progress"),
 ) -> None:
-    """Pull/download a model (v1.1 feature - placeholder)."""
-    console.print("[yellow]Model pull will be available in v1.1[/yellow]")
+    """Pull/download a model from registry."""
+    obj = ctx.obj or {}
+
+    try:
+        with create_client(
+            profile=obj.get("profile"),
+            uri=obj.get("uri"),
+            token=obj.get("token"),
+        ) as client:
+            # Check if model already exists
+            if not force:
+                try:
+                    existing = client.get(f"/api/models/{model_name}")
+                    if existing.status_code == 200:
+                        console.print(
+                            f"[yellow]Model '{model_name}' already exists. "
+                            "Use --force to re-pull.[/yellow]"
+                        )
+                        return
+                except Exception:
+                    # Model doesn't exist, proceed with pull
+                    pass
+
+            # Pull the model
+            if progress:
+                console.print(f"[cyan]Pulling model: {model_name}...[/cyan]")
+
+            response = client.post(
+                "/api/models/pull",
+                json={"name": model_name},
+            )
+            data = handle_response(response)
+
+            # Check if pull was successful
+            if data.get("status") == "success" or response.status_code == 200:
+                console.print(f"[green]Successfully pulled model: {model_name}[/green]")
+            else:
+                # API returned 200 but status indicates potential issue
+                error_msg = data.get("message", data.get("error", "Unknown error"))
+                console.print(f"[yellow]Pull completed with status: {error_msg}[/yellow]")
+
+    except Exception as e:
+        handle_request_error(e)
 
 
 @app.command()
@@ -102,5 +146,23 @@ def delete(
     model_name: str = typer.Argument(..., help="Model name to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
 ) -> None:
-    """Delete a model (v1.1 feature - placeholder)."""
-    console.print("[yellow]Model delete will be available in v1.1[/yellow]")
+    """Delete a model from the system."""
+    obj = ctx.obj or {}
+
+    if not force:
+        confirm = typer.confirm(f"Delete model '{model_name}'?", default=False)
+        if not confirm:
+            raise typer.Abort()
+
+    try:
+        with create_client(
+            profile=obj.get("profile"),
+            uri=obj.get("uri"),
+            token=obj.get("token"),
+        ) as client:
+            response = client.delete(f"/api/models/{model_name}")
+            handle_response(response)
+            console.print(f"[green]Successfully deleted model: {model_name}[/green]")
+
+    except Exception as e:
+        handle_request_error(e)

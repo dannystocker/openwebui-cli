@@ -2,6 +2,7 @@
 
 import json
 import sys
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -94,7 +95,7 @@ def send(
     messages.append({"role": "user", "content": prompt})
 
     # Build request body
-    body: dict = {
+    body: dict[str, Any] = {
         "model": effective_model,
         "messages": messages,
         "stream": not no_stream and config.defaults.stream,
@@ -108,8 +109,8 @@ def send(
     # Add RAG context if specified
     files_context = []
     if file:
-        for f in file:
-            files_context.append({"type": "file", "id": f})
+        for file_id in file:
+            files_context.append({"type": "file", "id": file_id})
     if collection:
         for c in collection:
             files_context.append({"type": "collection", "id": c})
@@ -124,6 +125,7 @@ def send(
         with create_client(
             profile=obj.get("profile"),
             uri=obj.get("uri"),
+            token=obj.get("token"),
             timeout=obj.get("timeout"),
         ) as client:
             if body.get("stream"):

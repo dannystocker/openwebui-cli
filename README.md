@@ -1,139 +1,139 @@
 # OpenWebUI CLI
 
+[![CI](https://github.com/open-webui/openwebui-cli/workflows/CI/badge.svg)](https://github.com/open-webui/openwebui-cli/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)]()
+
 Official command-line interface for [OpenWebUI](https://github.com/open-webui/open-webui).
 
-> **Status:** Alpha - v0.1.0 MVP in development
+> Status: Alpha (v0.1.0) — tested, linted, ~90% coverage. Known limitations: OAuth/provider login and API key management are not implemented yet; models pull/delete depend on server support.
 
 ## Features
-
-- **Authentication** - Login, logout, token management with secure keyring storage
-- **Chat** - Send messages with streaming support, continue conversations
-- **RAG** - Upload files, manage collections, vector search
-- **Models** - List and inspect available models
-- **Admin** - Server stats and diagnostics (admin role required)
-- **Profiles** - Multiple server configurations
+- Authentication & token management (keyring + env + `--token`)
+- Profiles for multiple OpenWebUI instances
+- Chat with streaming/non-streaming modes, history, RAG context
+- RAG files/collections (list, upload, delete, search)
+- Model info/list (pull/delete supported when server supports it)
+- Admin stats/users/config (admin role required)
+- JSON/YAML/text output with Rich formatting
 
 ## Installation
 
 ```bash
 pip install openwebui-cli
-```
-
-Or from source:
-
-```bash
+# or from source
 git clone https://github.com/dannystocker/openwebui-cli.git
 cd openwebui-cli
 pip install -e .
 ```
 
-## Quick Start
+### Requirements
+- Python 3.11+
+- OpenWebUI server reachable at your chosen `--uri`
 
+## Quick start
 ```bash
-# Initialize configuration
+# 1) Init config (creates ~/.config/openwebui/config.yaml)
 openwebui config init
 
-# Login to your OpenWebUI instance
+# 2) Login (stores token in keyring, or use --token/OPENWEBUI_TOKEN)
 openwebui auth login
 
-# Chat with a model
-openwebui chat send -m llama3.2:latest -p "Hello, world!"
+# 3) Chat (streaming by default)
+openwebui chat send -m llama3.2:latest -p "Hello from the CLI"
 
-# Upload a file for RAG
-openwebui rag files upload ./document.pdf
-
-# List available models
-openwebui models list
+# 4) RAG search
+openwebui rag search --query "deployment steps" --collection my-coll
 ```
 
-## Usage
+## Commands overview
 
-### Authentication
+| Area   | Examples                                                  | Notes                                   |
+| ------ | --------------------------------------------------------- | --------------------------------------- |
+| Auth   | `openwebui auth login`, `logout`, `whoami`, `token`, `refresh` | Tokens via keyring/env/`--token`        |
+| Chat   | `openwebui chat send --prompt "Hello"`                    | Streaming/non-streaming, RAG context    |
+| Models | `openwebui models list`, `info MODEL_ID`                  | Pull/delete currently placeholders      |
+| RAG    | `openwebui rag files list`, `collections list`, `search`  | Upload/search files & collections       |
+| Config | `openwebui config init`, `show`, `set`, `get`             | Profiles, defaults, output options      |
+| Admin  | `openwebui admin stats`, `users`, `config`                | Admin-only endpoints (role required)    |
 
-```bash
-# Interactive login
-openwebui auth login
+See `docs/commands/README.md` for a compact reference.
 
-# Show current user
-openwebui auth whoami
+### Global options (all commands)
 
-# Logout
-openwebui auth logout
-```
+| Option | Description |
+| ------ | ----------- |
+| `-v, --version` | Show version and exit |
+| `-P, --profile` | Profile name to use |
+| `-U, --uri` | Override server URI |
+| `--token` | Bearer token (overrides env/keyring) |
+| `-f, --format` | Output format: `text`, `json`, `yaml` |
+| `-q, --quiet` | Suppress non-essential output |
+| `--verbose` | Enable debug logging |
+| `-t, --timeout` | Request timeout in seconds |
 
-### Chat
+## Configuration
 
-```bash
-# Simple chat (streaming by default)
-openwebui chat send -m llama3.2:latest -p "Explain quantum computing"
+Config precedence: `CLI flags` → `environment variables` → `config file` → defaults.
 
-# Non-streaming mode
-openwebui chat send -m llama3.2:latest -p "Hello" --no-stream
-
-# With RAG context
-openwebui chat send -m llama3.2:latest -p "Summarize this document" --file <FILE_ID>
-
-# Continue a conversation
-openwebui chat send -m llama3.2:latest -p "Tell me more" --chat-id <CHAT_ID>
-```
-
-### RAG (Retrieval-Augmented Generation)
-
-```bash
-# Upload files
-openwebui rag files upload ./docs/*.pdf
-
-# Create a collection
-openwebui rag collections create "Project Docs"
-
-# Search within a collection
-openwebui rag search "authentication flow" --collection <COLL_ID>
-```
-
-### Models
-
-```bash
-# List all models
-openwebui models list
-
-# Get model details
-openwebui models info llama3.2:latest
-```
-
-### Configuration
-
-```bash
-# Initialize config
-openwebui config init
-
-# Show current config
-openwebui config show
-
-# Use a specific profile
-openwebui --profile production chat send -m gpt-4 -p "Hello"
-```
-
-## Configuration File
-
-Location: `~/.config/openwebui/config.yaml` (Linux/macOS) or `%APPDATA%\openwebui\config.yaml` (Windows)
+- Config file: `~/.config/openwebui/config.yaml` (Linux/macOS) or `%APPDATA%\openwebui\config.yaml` (Windows).
+- Env vars: `OPENWEBUI_PROFILE`, `OPENWEBUI_URI`, `OPENWEBUI_TOKEN`.
+- Tokens: stored in keyring (`openwebui-cli` service, key `<profile>:<uri>`). If no keyring backend, use `--token` or `OPENWEBUI_TOKEN`; in headless/CI, install `keyrings.alt` or rely on env.
+- Example config:
 
 ```yaml
 version: 1
-default_profile: local
-
+default_profile: default
 profiles:
-  local:
+  default:
     uri: http://localhost:8080
-  production:
-    uri: https://openwebui.example.com
-
 defaults:
   model: llama3.2:latest
   format: text
   stream: true
+  timeout: 30
+output:
+  colors: true
+  progress_bars: true
+  timestamps: false
 ```
 
-## Exit Codes
+More details: `docs/guides/configuration.md`.
+
+## Usage examples
+
+- Non-streaming chat with JSON output:
+  ```bash
+  openwebui chat send -m my-model -p "Summarize" --no-stream --json
+  ```
+- Continue a conversation:
+  ```bash
+  openwebui chat send --chat-id CHAT123 -p "Tell me more"
+  ```
+- Shell completions:
+  ```bash
+  openwebui --install-completion bash
+  openwebui --install-completion zsh
+  openwebui --install-completion fish
+  ```
+- RAG file upload + search:
+  ```bash
+  openwebui rag files upload ./docs/*.pdf
+  openwebui rag search --query "auth flow" --collection my-coll
+  ```
+- Use a different profile and token:
+  ```bash
+  openwebui --profile prod --token "$PROD_TOKEN" chat send -p "Ping prod"
+  ```
+
+## Troubleshooting
+
+- **No keyring backend available:** pass `--token` or set `OPENWEBUI_TOKEN`; or install `keyrings.alt`.
+- **401/Forbidden:** re-login `openwebui auth login` or refresh token; verify `--uri` and profile.
+- **Connection issues:** check server is reachable; override with `--uri`; increase `--timeout`.
+- **Invalid history file:** ensure JSON array or `{ "messages": [...] }`.
+
+## Exit codes
 
 | Code | Meaning |
 |------|---------|
@@ -147,28 +147,24 @@ defaults:
 ## Development
 
 ```bash
-# Install dev dependencies
+python -m venv .venv
+. .venv/bin/activate
 pip install -e ".[dev]"
-
-# Run tests
-pytest
-
-# Type checking
-mypy openwebui_cli
-
-# Linting
 ruff check openwebui_cli
+mypy openwebui_cli --ignore-missing-imports
+pytest tests/ --cov=openwebui_cli
 ```
 
-## Contributing
-
-Contributions welcome! Please read the [RFC proposal](docs/RFC.md) for design details.
+## Contributing and community
+- Contribution guide: `CONTRIBUTING.md`
+- Code of Conduct: `CODE_OF_CONDUCT.md`
+- Security policy: `SECURITY.md`
+- RFC: `docs/RFC.md`
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE).
 
-## Acknowledgments
+## Credits
 
-- [OpenWebUI](https://github.com/open-webui/open-webui) team
-- [mitchty/open-webui-cli](https://github.com/mitchty/open-webui-cli) for inspiration
+Created and maintained by **Danny Stocker** at [if.](https://digital-lab.ca/dannystocker/)

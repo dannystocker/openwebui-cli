@@ -14,7 +14,11 @@ KEYRING_SERVICE = "openwebui-cli"
 def get_token(profile: str, uri: str) -> str | None:
     """Retrieve token from system keyring."""
     key = f"{profile}:{uri}"
-    return keyring.get_password(KEYRING_SERVICE, key)
+    try:
+        return keyring.get_password(KEYRING_SERVICE, key)
+    except keyring.errors.KeyringError:
+        # No keyring backend available; allow caller to fall back to env/CLI token.
+        return None
 
 
 def set_token(profile: str, uri: str, token: str) -> None:
@@ -37,6 +41,7 @@ def create_client(
     uri: str | None = None,
     token: str | None = None,
     timeout: float | None = None,
+    allow_unauthenticated: bool = False,
 ) -> httpx.Client:
     """
     Create an HTTP client configured for OpenWebUI API.
@@ -53,12 +58,33 @@ def create_client(
     effective_uri, effective_profile = get_effective_config(profile, uri)
     config = load_config()
 
-    # Get token with precedence: param > env var > keyring
+    # Get token with precedence: CLI param > env var > keyring
     if token is None:
         from .config import Settings
 
         settings = Settings()
-        token = settings.openwebui_token or get_token(effective_profile, effective_uri)
+        token = settings.openwebui_token
+        if token is None:
+            try:
+                token = get_token(effective_profile, effective_uri)
+            except keyring.errors.KeyringError as e:
+                raise AuthError(
+                    "No keyring backend available.\n"
+                    "Set OPENWEBUI_TOKEN or pass --token to use the CLI without keyring, "
+                    "or install a keyring backend (e.g., pip install keyrings.alt)."
+                ) from e
+
+    if token is None:
+        if allow_unauthenticated:
+            token = None
+        else:
+            raise AuthError(
+                "No authentication token available.\n"
+                "Log in with 'openwebui auth login' or provide a token via:\n"
+                "  - env: OPENWEBUI_TOKEN\n"
+                "  - CLI: --token <TOKEN>\n"
+                "If using keyring, install a backend (e.g., keyrings.alt)."
+            )
 
     # Build headers
     headers = {
@@ -84,17 +110,37 @@ def create_async_client(
     uri: str | None = None,
     token: str | None = None,
     timeout: float | None = None,
+    allow_unauthenticated: bool = False,
 ) -> httpx.AsyncClient:
     """Create an async HTTP client configured for OpenWebUI API."""
     effective_uri, effective_profile = get_effective_config(profile, uri)
     config = load_config()
 
-    # Get token with precedence: param > env var > keyring
+    # Get token with precedence: CLI param > env var > keyring
     if token is None:
         from .config import Settings
 
         settings = Settings()
-        token = settings.openwebui_token or get_token(effective_profile, effective_uri)
+        token = settings.openwebui_token
+        if token is None:
+            try:
+                token = get_token(effective_profile, effective_uri)
+            except keyring.errors.KeyringError as e:
+                raise AuthError(
+                    "No keyring backend available.\n"
+                    "Set OPENWEBUI_TOKEN or pass --token to use the CLI without keyring, "
+                    "or install a keyring backend (e.g., pip install keyrings.alt)."
+                ) from e
+
+    if token is None:
+        if not allow_unauthenticated:
+            raise AuthError(
+                "No authentication token available.\n"
+                "Log in with 'openwebui auth login' or provide a token via:\n"
+                "  - env: OPENWEBUI_TOKEN\n"
+                "  - CLI: --token <TOKEN>\n"
+                "If using keyring, install a backend (e.g., keyrings.alt)."
+            )
 
     headers = {
         "Content-Type": "application/json",
@@ -165,13 +211,20 @@ def handle_response(response: httpx.Response) -> dict[str, Any]:
         )
 
     try:
-        return response.json()
+        data: dict[str, Any] = response.json()
+        return data
     except Exception:
         return {"text": response.text}
 
 
 def handle_request_error(error: Exception) -> None:
     """Convert httpx errors to CLI errors."""
+    if isinstance(error, keyring.errors.KeyringError):
+        raise AuthError(
+            "Keyring is unavailable.\n"
+            "Install a backend (e.g., pip install keyrings.alt) or provide a token via "
+            "OPENWEBUI_TOKEN / --token."
+        )
     if isinstance(error, httpx.ConnectError):
         raise NetworkError(
             f"Could not connect to server: {error}\n"

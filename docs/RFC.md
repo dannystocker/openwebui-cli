@@ -308,7 +308,7 @@ openwebui-cli/
 
 ### Configuration File
 
-**Location:** `~/.openwebui/config.yaml`
+**Location:** `~/.config/openwebui/config.yaml` (Linux/macOS) or `%APPDATA%\\openwebui\\config.yaml` (Windows)
 
 ```yaml
 # OpenWebUI CLI Configuration
@@ -340,6 +340,47 @@ output:
   timestamps: false
 ```
 
+### Token Handling & Precedence
+
+**Token sources (in order of precedence):**
+
+1. **CLI flag** (highest priority):
+   ```bash
+   openwebui --token "sk-xxxx..." chat send -m llama3.2 -p "Hello"
+   ```
+
+2. **Environment variable:**
+   ```bash
+   export OPENWEBUI_TOKEN="sk-xxxx..."
+   openwebui chat send -m llama3.2 -p "Hello"
+   ```
+
+3. **System keyring** (lowest priority):
+   - Automatically set after `openwebui auth login`
+   - Stored under service name: `openwebui-cli`
+   - Python implementation:
+   ```python
+   import keyring
+   token = keyring.get_password("openwebui-cli", f"{profile}:{uri}")
+   ```
+
+**Headless/CI environments without keyring:**
+```bash
+# Option 1: Environment variable (recommended for CI)
+export OPENWEBUI_TOKEN="sk-xxxx..."
+openwebui chat send -m llama3.2 -p "Hello"
+
+# Option 2: CLI flag (for scripts)
+openwebui --token "sk-xxxx..." chat send -m llama3.2 -p "Hello"
+
+# Option 3: Install lightweight backend
+pip install keyrings.alt
+```
+
+**Token storage notes:** Tokens are stored securely in the system keyring by default (NOT in config file).
+In headless/CI environments without a keyring backend, use `--token` or `OPENWEBUI_TOKEN` environment variable.
+For a lightweight backend in CI/containers, install `keyrings.alt` in the runtime environment.
+
 ### Authentication Flow
 
 ```
@@ -349,15 +390,10 @@ output:
    > Enter password: ********
    > Token saved to keyring
 
-2. OAuth flow:
-   $ openwebui auth login --oauth --provider google
-   > Opening browser for authentication...
-   > Token saved to keyring
-
-3. API key (for scripts):
-   $ openwebui auth keys create my-script --scopes chat,models
-   > API Key: sk-xxxxxxxxxxxx
-   > (Use with OPENWEBUI_TOKEN env var)
+2. Future (not implemented in v0.1.0-alpha):
+   - OAuth flow (e.g., `openwebui auth login --oauth --provider google`)
+   - API key management (`openwebui auth keys ...`)
+   These are intentionally deferred to a later release; current auth is password + token storage (keyring/env/flag).
 ```
 
 ### Streaming Implementation
@@ -494,137 +530,210 @@ These are ideal follow-ups once v1.0 is stable:
 
 ---
 
+## Testing Strategy
+
+### Unit Tests
+
+Commands can be tested via pytest with mocked HTTP responses:
+
+```python
+# tests/test_chat.py
+import pytest
+from unittest.mock import patch, MagicMock
+from openwebui_cli.commands.chat import send_chat
+
+@pytest.mark.asyncio
+async def test_chat_send_basic():
+    """Test basic chat send functionality."""
+    with patch('openwebui_cli.client.HTTPClient.post') as mock_post:
+        mock_post.return_value = {"choices": [{"message": {"content": "Hello!"}}]}
+        result = await send_chat(
+            client=MagicMock(),
+            model="llama3.2:latest",
+            prompt="Hi"
+        )
+        assert result == "Hello!"
+```
+
+### Integration Tests
+
+Test against a running OpenWebUI instance (docker-compose setup provided):
+
+```bash
+# Start local OpenWebUI for testing
+docker-compose -f tests/docker-compose.yml up -d
+
+# Run integration tests
+pytest tests/integration/ -v
+
+# Clean up
+docker-compose -f tests/docker-compose.yml down
+```
+
+### Testing Commands
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage report
+pytest --cov=openwebui_cli --cov-report=html
+
+# Run specific test
+pytest tests/test_auth.py::test_login
+
+# Run tests marked as slow separately
+pytest -m slow
+
+# Run tests with verbose output and print statements
+pytest -vv -s
+```
+
+---
+
 ## Implementation Checklist (22 Concrete Steps)
 
 Use this as a PR checklist:
 
 ### A. Skeleton & CLI Wiring
 
-1. **Create package layout** in monorepo:
+- [x] **Create package layout** in monorepo:
    ```text
-   open-webui/
-     cli/
-       pyproject.toml
-       openwebui_cli/
+   openwebui-cli/
+     pyproject.toml
+     README.md
+     docs/RFC.md
+     openwebui_cli/
+       __init__.py
+       main.py
+       config.py
+       auth.py
+       http.py
+       errors.py
+       commands/
          __init__.py
-         main.py
-         config.py
          auth.py
          chat.py
-         rag.py
+         config_cmd.py
          models.py
          admin.py
-         http.py
-         errors.py
+         rag.py
+       formatters/
+         __init__.py
+       utils/
+         __init__.py
    ```
 
-2. **Wire Typer app** in `main.py`:
+- [x] **Wire Typer app** in `main.py`:
    - Main `app = typer.Typer()`
    - Sub-apps: `auth_app`, `chat_app`, `rag_app`, `models_app`, `admin_app`, `config_app`
    - Global options (profile, uri, format, quiet, verbose, timeout)
 
-3. **Implement central HTTP client helper** in `http.py`:
-   - Builds `httpx.Client` from resolved URI, timeout, auth headers
-   - Token from keyring
+- [x] **Implement central HTTP client helper** in `http.py`:
+   - Builds `httpx.AsyncClient` from resolved URI, timeout, auth headers
+   - Token from keyring, env, or CLI flag
    - Standard error translation → `CLIError` subclasses
 
 ### B. Config & Profiles
 
-4. **Implement config path resolution:**
+- [x] **Implement config path resolution:**
    - Unix: XDG → `~/.config/openwebui/config.yaml`
    - Windows: `%APPDATA%\openwebui\config.yaml`
 
-5. **Implement config commands:**
+- [x] **Implement config commands:**
    - `config init` (interactive: ask URI, default model, default format)
    - `config show` (redact secrets, e.g. token placeholders)
 
-6. **Implement config loading & precedence:**
+- [x] **Implement config loading & precedence:**
    - Load file → apply profile → apply env → override with CLI flags
 
 ### C. Auth Flow
 
-7. **Implement token storage using `keyring`:**
+- [x] **Implement token storage using `keyring`:**
    - Key name: `openwebui:{profile}:{uri}`
 
-8. **`auth login`:**
+- [x] **`auth login`:**
    - Prompt for username/password
    - Exchange for token using server's auth endpoint
-   - Future: add browser-based OAuth once endpoints are known
+   - Save token to keyring
 
-9. **`auth logout`:**
+- [x] **`auth logout`:**
    - Delete token from keyring
 
-10. **`auth whoami`:**
-    - Call `/me`/`/users/me` style endpoint
-    - Print name, email, roles
+- [x] **`auth whoami`:**
+   - Call `/api/v1/auths/` endpoint
+   - Print name, email, roles
 
-11. **`auth token`:**
-    - Show minimal info: token type, expiry
-    - Not the full raw token (or show only if `--debug`)
+- [x] **`auth token`:**
+   - Show minimal info: token type, expiry
+   - Not the full raw token
 
-12. **`auth refresh`:**
-    - Call refresh endpoint if available
-    - Update token in keyring
-    - Exit code `3` if refresh fails due to auth
+- [ ] **`auth refresh`:** (v1.1+)
+   - Call refresh endpoint if available
+   - Update token in keyring
+   - Exit code `3` if refresh fails due to auth
 
 ### D. Chat Send + Streaming
 
-13. **Implement `chat send`:**
-    - Resolve model, prompt, chat ID, history file
-    - If streaming:
-      - Use HTTP streaming endpoint
-      - Print tokens as they arrive
-      - Handle Ctrl-C gracefully
-    - If `--no-stream`:
-      - Wait for full response
-      - Respect `--format`/`--json`:
-        - `text`: print body content only
-        - `json`: print full JSON once
+- [x] **Implement `chat send`:**
+   - Resolve model, prompt, chat ID
+   - Streaming support with `httpx` async streaming
+   - Print tokens as they arrive with proper formatting
+   - Handle Ctrl-C gracefully
+   - Support `--no-stream` for full response
 
-14. **Ensure exit codes follow the table:**
-    - Usage errors → 2
-    - Auth failures → 3
-    - Network errors → 4
-    - Server error (e.g., 500) → 5
+- [x] **Ensure exit codes follow the table:**
+   - Usage errors → 2
+   - Auth failures → 3
+   - Network errors → 4
+   - Server error (e.g., 500) → 5
 
 ### E. RAG Minimal API
 
-15. **Implement `rag files list/upload/delete`:**
-    - Upload: handle multiple paths; show IDs
-    - `--collection` optional; if set, also attach uploaded files
+- [x] **Implement `rag files list/upload/delete`:**
+   - Upload: handle multiple paths; show IDs
+   - `--collection` optional; attach uploaded files if provided
 
-16. **Implement `rag collections list/create/delete`**
+- [x] **Implement `rag collections list/create/delete`**
 
-17. **Implement `rag search`:**
-    - Non-streaming only (v1.0)
-    - Default `--format json`; text mode optionally summarized
-    - Return exit code `0` even for empty results; use `1` only when *error*
+- [x] **Implement `rag search`:**
+   - Vector search via API
+   - Default `--format json`; text mode displays results
+   - Return exit code `0` even for empty results; use `1` only on error
 
 ### F. Models & Admin
 
-18. **Models:**
-    - Implement `models list` and `models info` wired to existing endpoints
+- [x] **Models:**
+   - `models list` - List available models
+   - `models info` - Show model details
+   - Support `--format json|text|yaml`
 
-19. **Admin:**
-    - Implement `admin stats` as a thin wrapper
-    - Check permission errors → exit code `3` with clear message:
-      > "Admin command requires admin privileges; your current user is 'X' with roles: [user]."
+- [x] **Admin:**
+   - `admin stats` - Server statistics
+   - Check permission errors → exit code `3` with clear message:
+     > "Admin command requires admin privileges; your current user is 'X' with roles: [user]."
 
 ### G. Tests & Docs
 
-20. **Add unit tests:**
-    - Config precedence
-    - Exit code mapping
-    - Basic command parsing (Typer's test runner)
+- [x] **Add unit tests:**
+   - Config precedence (test_config.py)
+   - Exit code mapping (test_errors.py)
+   - Auth flow (test_auth_cli.py)
+   - Chat commands (test_chat.py)
+   - RAG commands (test_rag.py)
+   - Models & Admin (test_models.py, test_admin.py)
 
-21. **Add smoke test script for maintainers:**
-    - `openwebui --help`
-    - `openwebui chat send --help`
-    - `openwebui rag search --help`
+- [x] **Add comprehensive README:**
+   - Installation & troubleshooting
+   - Configuration with token precedence
+   - Quick start examples
+   - Complete usage guide
+   - Development setup
 
-22. **Add minimal README for the CLI:**
-    - Install (`pip install openwebui-cli` / `open-webui[cli]`)
-    - Basic `auth login`, `chat send`, `rag search` examples
+- [x] **Update RFC documentation:**
+   - Token handling & precedence
+   - Testing strategy
+   - Implementation checklist with status
 
 ---
 

@@ -1,10 +1,12 @@
 """Authentication commands."""
 
+import sys
+
 import typer
 from rich.console import Console
 from rich.prompt import Prompt
 
-from ..config import get_effective_config
+from ..config import Settings, get_effective_config
 from ..errors import AuthError
 from ..http import (
     create_client,
@@ -33,12 +35,20 @@ def login(
 
     # Prompt for credentials if not provided
     if username is None:
-        username = Prompt.ask("Username or email")
+        if sys.stdin.isatty():
+            username = Prompt.ask("Username or email")
+        else:
+            console.print("Username or email: ", end="")
+            username = sys.stdin.readline().strip()
     if password is None:
-        password = Prompt.ask("Password", password=True)
+        if sys.stdin.isatty():
+            password = Prompt.ask("Password", password=True)
+        else:
+            console.print("Password: ", end="")
+            password = sys.stdin.readline().strip()
 
     try:
-        with create_client(profile=profile, uri=uri) as client:
+        with create_client(profile=profile, uri=uri, allow_unauthenticated=True) as client:
             response = client.post(
                 "/api/v1/auths/signin",
                 json={"email": username, "password": password},
@@ -76,7 +86,9 @@ def whoami(ctx: typer.Context) -> None:
     obj = ctx.obj or {}
 
     try:
-        with create_client(profile=obj.get("profile"), uri=obj.get("uri")) as client:
+        with create_client(
+            profile=obj.get("profile"), uri=obj.get("uri"), token=obj.get("token")
+        ) as client:
             response = client.get("/api/v1/auths/")
             data = handle_response(response)
 
@@ -97,7 +109,8 @@ def token(
     obj = ctx.obj or {}
     uri, profile = get_effective_config(obj.get("profile"), obj.get("uri"))
 
-    stored_token = get_token(profile, uri)
+    settings = Settings()
+    stored_token = settings.openwebui_token or get_token(profile, uri)
     if stored_token:
         if show:
             console.print(f"[bold]Token:[/bold] {stored_token}")
@@ -118,7 +131,9 @@ def refresh(ctx: typer.Context) -> None:
     obj = ctx.obj or {}
 
     try:
-        with create_client(profile=obj.get("profile"), uri=obj.get("uri")) as client:
+        with create_client(
+            profile=obj.get("profile"), uri=obj.get("uri"), token=obj.get("token")
+        ) as client:
             response = client.post("/api/v1/auths/refresh")
             data = handle_response(response)
 

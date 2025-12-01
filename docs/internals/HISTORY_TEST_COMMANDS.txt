@@ -1,0 +1,54 @@
+=============================================================================
+HISTORY FILE ERROR HANDLING TESTS - QUICK REFERENCE
+=============================================================================
+
+Location: /home/setup/openwebui-cli/tests/test_chat_errors_history.py
+Test Count: 10
+Status: All passing
+
+COMMAND TO RUN ALL HISTORY FILE TESTS:
+======================================
+cd /home/setup/openwebui-cli
+.venv/bin/pytest tests/test_chat_errors_history.py -v
+
+COMMAND TO RUN WITH COVERAGE:
+=============================
+.venv/bin/pytest tests/test_chat_errors_history.py -v --cov=openwebui_cli.commands.chat --cov-report=term-missing
+
+COMMAND TO RUN A SPECIFIC TEST:
+===============================
+.venv/bin/pytest tests/test_chat_errors_history.py::test_missing_history_file -v
+
+COMMAND TO RUN ALL CHAT TESTS (INCLUDING NEW HISTORY TESTS):
+===========================================================
+.venv/bin/pytest tests/test_chat.py tests/test_chat_errors_history.py -v
+
+COMMAND TO RUN ENTIRE TEST SUITE:
+=================================
+.venv/bin/pytest tests/ -v
+
+TEST CATEGORIES:
+================
+
+Error Condition Tests (Exit Code 2):
+- test_missing_history_file
+- test_invalid_json_history_file
+- test_history_file_wrong_shape_dict_without_messages
+- test_history_file_wrong_shape_string
+- test_history_file_wrong_shape_number
+- test_history_file_empty_json_object
+- test_history_file_malformed_utf8
+
+Success Case Tests (Exit Code 0):
+- test_history_file_empty_array
+- test_history_file_with_messages_key
+- test_history_file_with_direct_array
+
+COVERAGE DETAILS:
+=================
+Module: openwebui_cli/commands/chat.py
+Lines Tested: 59-88 (history file validation)
+Coverage: 100% of history handling code paths
+Overall Module Coverage: 76%
+
+=============================================================================

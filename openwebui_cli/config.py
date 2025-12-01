@@ -90,7 +90,7 @@ def save_config(config: Config) -> None:
 def get_effective_config(
     profile: str | None = None,
     uri: str | None = None,
-) -> tuple[str, str | None]:
+) -> tuple[str, str]:
     """
     Get effective URI and profile name, respecting precedence:
     CLI flags > env vars > config file > defaults

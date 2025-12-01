@@ -33,6 +33,12 @@ def main(
     version: bool = typer.Option(False, "--version", "-v", help="Show version"),
     profile: str | None = typer.Option(None, "--profile", "-P", help="Use named profile"),
     uri: str | None = typer.Option(None, "--uri", "-U", help="Server URI"),
+    token: str | None = typer.Option(
+        None,
+        "--token",
+        help="Bearer token (overrides env/keyring)",
+        envvar="OPENWEBUI_TOKEN",
+    ),
     format: str | None = typer.Option(
         None, "--format", "-f", help="Output format: text, json, yaml"
     ),
@@ -49,6 +55,7 @@ def main(
     ctx.ensure_object(dict)
     ctx.obj["profile"] = profile
     ctx.obj["uri"] = uri
+    ctx.obj["token"] = token
     ctx.obj["format"] = format or "text"
     ctx.obj["quiet"] = quiet
     ctx.obj["verbose"] = verbose
