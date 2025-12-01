@@ -4,6 +4,7 @@ from typing import Any
 
 import httpx
 import keyring
+from rich.console import Console
 
 from .config import get_effective_config, load_config
 from .errors import AuthError, NetworkError, ServerError
@@ -248,11 +249,24 @@ def handle_request_error(error: Exception) -> None:
             url_msg = f" (URL: {request_url!s})"
         except Exception:
             url_msg = ""
+        verbose_note = " Use --verbose for details." if _is_verbose_enabled() else ""
         raise NetworkError(
             f"Request failed: {error}{url_msg}\n"
-            "Check your network connection and server configuration. "
-            "Use --verbose to see more details."
+            f"Check your network connection and server configuration.{verbose_note}"
         )
     else:
         # Bubble up unknown errors unchanged (e.g., typer.Exit for graceful exits)
         raise error
+
+
+def _is_verbose_enabled() -> bool:
+    """Return True if the current Typer context has verbose/debug enabled."""
+    try:
+        import typer
+
+        ctx = typer.get_current_context(silent=True)
+        if ctx and isinstance(ctx.obj, dict):
+            return bool(ctx.obj.get("verbose"))
+    except Exception:
+        return False
+    return False
